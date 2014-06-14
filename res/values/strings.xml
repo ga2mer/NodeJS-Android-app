@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<resources>
+    <string name="app_name">NodeJSApp</string>
+    <string name="about">12</string>
+    <string name="exit">1</string>
+</resources>

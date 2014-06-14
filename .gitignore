@@ -1,0 +1,6 @@
+assets/*
+bin/*
+.DS_Store
+obj/
+gen/*
+*/.*
