@@ -6,7 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Map;
+import java.io.OutputStream;
 import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -21,8 +21,10 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.res.AssetManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -30,7 +32,7 @@ import android.util.Log;
 import android.webkit.WebView;
 import android.widget.Toast;
 
-public/* abstract */class LaunchActivity extends Activity implements ServiceConnection
+public class LaunchActivity extends Activity implements ServiceConnection
 {
     private WebView webView;
 
@@ -53,44 +55,17 @@ public/* abstract */class LaunchActivity extends Activity implements ServiceConn
         
         Log.i("LaunchActivity", "Intent = " + intent.getAction());
         
-        if (intent.getAction().equals(Intent.ACTION_MAIN))
-        {
-            deploy();
+            try {
+				deploy();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 
             launchService();
-            setContentView(R.layout.web);
-            webView = (WebView) findViewById(R.id.webView1);
-            webView.getSettings().setJavaScriptEnabled(true);
-            webView.loadUrl("http://127.0.0.1:8888");
-        }
-        else
-        {
-            {
-                Properties props = new Properties();
-                FileInputStream in;
-                try
-                {
-                    in = new FileInputStream(getFilesDir() + "/config.props");
-                    props.load(in);
-                    in.close();
-                }
-                catch(IOException e)
-                {
-                    e.printStackTrace();
-                }
-
-                String port = props.getProperty("port");
-            
-                String ipAddress = NetUtil.getLocalIpAddress(this);
-                intent = new Intent(Intent.ACTION_VIEW);
-                intent.setData(Uri.parse("http://" + ipAddress + ":" + port + "/exit.html?exit=true"));
-                startActivity(intent);
-                stopService(new Intent(NodeService.LAUNCH_NODE));
-            }
-        }
     }
 
-    private void deploy()
+    private void deploy() throws IOException
     {
         File filedir = getFilesDir();
         File config = new File(filedir, "config.props");
@@ -98,51 +73,40 @@ public/* abstract */class LaunchActivity extends Activity implements ServiceConn
         {
             return;
         }
-
-        int resId = getResources().getIdentifier("web", "raw", getPackageName());
-        InputStream webStream = getResources().openRawResource(resId);
-        if (webStream != null)
-        {
-            try
-            {
-                JarInputStream jin = new JarInputStream(webStream);
-                JarEntry entry;
-                while ((entry = jin.getNextJarEntry()) != null)
-                {
-                    String entryName = entry.getName();
-                    File file = new File(filedir, entryName);
-                    if (entry.isDirectory())
-                    {
-                        if (!file.exists())
-                        {
-                            file.mkdirs();
-                        }
-                    }
-                    else
-                    {
-                        File dir = new File(file.getParent());
-                        if (!dir.exists())
-                        {
-                            dir.mkdirs();
-                        }
-                        FileOutputStream fout = null;
-                        try
-                        {
-                            fout = new FileOutputStream(file);
-                            NetUtil.copyIO(jin, fout);
-                        }
-                        finally
-                        {
-                            fout.close();
-                        }
-                    }
-                }
+        
+        AssetManager assetManager = getAssets();
+        String[] files = null;
+        try {
+            files = assetManager.list("web");
+        } catch (IOException e) {
+            Log.e("tag", e.getMessage());
+        }
+ 
+        for(String filename : files) {
+            System.out.println("Filename => "+filename);
+            InputStream in = null;
+            OutputStream out = null;
+            try {
+              in = assetManager.open("web/"+filename);   // if files resides inside the "Files" directory itself
+              out = new FileOutputStream(filedir +"/" + filename);
+              copyFile(in, out);
+              in.close();
+              in = null;
+              out.flush();
+              out.close();
+              out = null;
+            } catch(Exception e) {
+                Log.e("tag", e.getMessage());
             }
-            catch(Exception e)
-            {
-
-            }
-            
+        }
+        
+    }
+    
+    private void copyFile(InputStream in, OutputStream out) throws IOException {
+        byte[] buffer = new byte[1024];
+        int read;
+        while((read = in.read(buffer)) != -1){
+          out.write(buffer, 0, read);
         }
     }
 
@@ -155,6 +119,9 @@ public/* abstract */class LaunchActivity extends Activity implements ServiceConn
         {
             finish();
         }
+    	setContentView(R.layout.web);
+        webView = (WebView) findViewById(R.id.webView1);
+        webView.getSettings().setJavaScriptEnabled(true);
     }
 
     @Override
@@ -193,19 +160,16 @@ public/* abstract */class LaunchActivity extends Activity implements ServiceConn
             fout.close();
             runNodeJs(mainfile, debugable);
             
-           /* mTask = new TimerTask()
+            mTask = new TimerTask()
             {
                 @Override
                 public void run()
                 {
-                    Intent notiIntent = new Intent(Intent.ACTION_VIEW);
-                    String ipAddress = NetUtil.getLocalIpAddress(LaunchActivity.this);
-                    notiIntent.setData(Uri.parse("http://yandex.ru"));
-                    startActivity(notiIntent);
+                    webView.loadUrl("http://127.0.0.1:8888");
                 }
             };
 
-            mTimer.schedule(mTask, 3000);*/
+            mTimer.schedule(mTask, 1000);
         }
         catch(FileNotFoundException e)
         {
@@ -221,7 +185,7 @@ public/* abstract */class LaunchActivity extends Activity implements ServiceConn
         {
             props = null;
         }
-        unbindService(this);
+        //unbindService(this);
         //finish();
     }
 
@@ -261,7 +225,7 @@ public/* abstract */class LaunchActivity extends Activity implements ServiceConn
     // protected abstract int getResourceId(String resourceName);
 
     private static NodeJsService mNodejs = null;
-    //private final Timer mTimer = new Timer();
-    //private TimerTask mTask;
+    private final Timer mTimer = new Timer();
+    private TimerTask mTask;
     private Handler mHandler;
 }

@@ -1,0 +1,7 @@
+port=8888
+main=index.js
+index=ind.html
+runlabel=1234
+littlelable=shuttleplay.net
+sdfolder=cchess/playlog
+debug=false
